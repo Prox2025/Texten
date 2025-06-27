@@ -6,7 +6,10 @@ const url = 'https://drive.google.com/uc?id=1onC2WQkWOwAd-ywH9qvcRSCw2uotyplh&ex
 
 (async () => {
   console.log('🚀 Iniciando Puppeteer...');
-  const browser = await puppeteer.launch({ headless: 'new' });
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
   const page = await browser.newPage();
 
   console.log('🌍 Acessando URL:', url);
@@ -29,7 +32,7 @@ const url = 'https://drive.google.com/uc?id=1onC2WQkWOwAd-ywH9qvcRSCw2uotyplh&ex
 
       response.on('data', chunk => {
         downloaded += chunk.length;
-        const percent = ((downloaded / totalSize) * 100).toFixed(2);
+        const percent = totalSize ? ((downloaded / totalSize) * 100).toFixed(2) : '...';
         process.stdout.write(`📦 Baixando... ${percent}%\r`);
       });
 
@@ -48,7 +51,7 @@ const url = 'https://drive.google.com/uc?id=1onC2WQkWOwAd-ywH9qvcRSCw2uotyplh&ex
   } catch (err) {
     console.error('❌ Erro no processo:', err.message);
   } finally {
-    await new Promise(r => setTimeout(r, 5000)); // aguardar download
+    await new Promise(r => setTimeout(r, 5000));
     await browser.close();
   }
 })();
