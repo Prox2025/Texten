@@ -1,23 +1,27 @@
-name: Download Google Drive Video
+name: Baixar Vídeo do Google Drive
 
 on:
   workflow_dispatch:
 
 jobs:
-  download_video:
+  baixar:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
+      - name: Instalar Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      - name: Install dependencies
-        run: npm install axios tough-cookie
+      - name: Instalar dependências
+        run: npm install puppeteer fs-extra axios
 
-      - name: Run download script
-        run: node download.js
+      - name: Criar script baixar.js
+        run: |
+          echo "" > baixar.js
+
+      - name: Executar script de download
+        run: node baixar.js
