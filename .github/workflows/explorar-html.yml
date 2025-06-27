@@ -29,7 +29,6 @@ jobs:
           echo "const puppeteer = require('puppeteer');
           const fs = require('fs');
           const axios = require('axios');
-          const path = require('path');
 
           (async () => {
             const url = process.env.DRIVE_URL;
@@ -39,7 +38,7 @@ jobs:
             console.log('🌐 Acessando: ' + url);
             await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
-            // Espera botão aparecer
+            // Espera seletor do botão aparecer
             await page.waitForSelector('#uc-download-link', { timeout: 10000 }).catch(() => {});
             const downloadLink = await page.$eval('#uc-download-link', el => el.href).catch(() => null);
 
@@ -51,12 +50,12 @@ jobs:
 
             console.log('✅ Link extraído: ' + downloadLink);
 
-            // Redirecionar para o link para obter o real
+            // Ir até o link final real
             const response = await page.goto(downloadLink, { waitUntil: 'networkidle2' });
             const finalUrl = response.url();
             console.log('🎯 Link final: ' + finalUrl);
 
-            // Baixar o vídeo com axios
+            // Download do vídeo
             const writer = fs.createWriteStream('video.mp4');
             const videoResponse = await axios({
               method: 'get',
@@ -82,7 +81,7 @@ jobs:
         run: node baixar.js
 
       - name: Upload do vídeo como artefato
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: video-google-drive
           path: video.mp4
