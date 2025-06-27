@@ -10,10 +10,8 @@ const jar = new CookieJar();
 
 async function downloadFile() {
   try {
-    // Primeira requisição: pegar a página inicial (pode vir aviso)
+    // Requisição inicial sem limitar redirecionamentos
     let response = await axios.get(URL_BASE, {
-      maxRedirects: 0,
-      validateStatus: status => status === 200 || status === 302,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
       },
@@ -21,31 +19,23 @@ async function downloadFile() {
       jar,
     });
 
-    if (response.status === 302) {
-      const redirectUrl = response.headers.location;
-      if (redirectUrl) {
-        console.log('Download direto: ', redirectUrl);
-        await saveFile(redirectUrl);
+    // Se o conteúdo for HTML com token confirm, extrai o token
+    if (typeof response.data === 'string') {
+      const html = response.data;
+      const confirmMatch = html.match(/confirm=([0-9A-Za-z_-]+)&/);
+      const confirm = confirmMatch ? confirmMatch[1] : null;
+
+      if (confirm) {
+        const downloadUrl = `https://drive.google.com/uc?export=download&confirm=${confirm}&id=${FILE_ID}`;
+        console.log('Token confirm encontrado:', confirm);
+        console.log('URL final de download:', downloadUrl);
+        await saveFile(downloadUrl);
         return;
       }
     }
 
-    const html = response.data;
-    const confirmMatch = html.match(/confirm=([0-9A-Za-z_-]+)&/);
-    const confirm = confirmMatch ? confirmMatch[1] : null;
-
-    if (!confirm) {
-      console.log('Não achou token confirm, tentando download direto...');
-      await saveFile(URL_BASE);
-      return;
-    }
-
-    const downloadUrl = `https://drive.google.com/uc?export=download&confirm=${confirm}&id=${FILE_ID}`;
-
-    console.log('Token confirm encontrado:', confirm);
-    console.log('URL final de download:', downloadUrl);
-
-    await saveFile(downloadUrl);
+    // Se resposta já for o arquivo (stream)
+    await saveFile(URL_BASE);
 
   } catch (error) {
     console.error('Erro ao baixar o arquivo:', error.message);
