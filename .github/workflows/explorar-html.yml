@@ -11,29 +11,27 @@ on:
 jobs:
   baixar-video:
     runs-on: ubuntu-latest
+    env:
+      ACTIONS_STEP_DEBUG: true
 
     steps:
-      - name: Checkout
+      - name: Checkout do código
         uses: actions/checkout@v3
 
-      - name: Instalar Node.js
+      - name: Configurar Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
 
-      - name: Instalar dependências
+      - name: Instalar dependências Node.js
         run: npm install puppeteer axios fs-extra
 
-      - name: Criar script baixar.js
-        run: |
-          echo "${{ secrets.SCRIPT_CONTENT }}" > baixar.js
-
-      - name: Executar Puppeteer para baixar vídeo
+      - name: Executar script baixar.js para baixar vídeo
         env:
           DRIVE_URL: ${{ github.event.inputs.drive_url }}
         run: node baixar.js
 
-      - name: Upload do vídeo como artefato
+      - name: Fazer upload do vídeo como artefato
         uses: actions/upload-artifact@v4
         with:
           name: video-google-drive
