@@ -38,7 +38,6 @@ jobs:
             console.log('🌐 Acessando: ' + url);
             await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
-            // Espera seletor do botão aparecer
             await page.waitForSelector('#uc-download-link', { timeout: 10000 }).catch(() => {});
             const downloadLink = await page.$eval('#uc-download-link', el => el.href).catch(() => null);
 
@@ -50,12 +49,10 @@ jobs:
 
             console.log('✅ Link extraído: ' + downloadLink);
 
-            // Ir até o link final real
             const response = await page.goto(downloadLink, { waitUntil: 'networkidle2' });
             const finalUrl = response.url();
             console.log('🎯 Link final: ' + finalUrl);
 
-            // Download do vídeo
             const writer = fs.createWriteStream('video.mp4');
             const videoResponse = await axios({
               method: 'get',
@@ -71,7 +68,6 @@ jobs:
             });
 
             console.log('📥 Vídeo salvo como video.mp4');
-
             await browser.close();
           })();" > baixar.js
 
