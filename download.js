@@ -1,70 +1,83 @@
 const axios = require('axios');
-const { CookieJar } = require('tough-cookie');
 const fs = require('fs');
 const path = require('path');
 
 const FILE_ID = '1onC2WQkWOwAd-ywH9qvcRSCw2uotyplh';
 const URL_BASE = `https://drive.google.com/uc?export=download&id=${FILE_ID}`;
 
-const jar = new CookieJar();
-
 async function downloadFile() {
   try {
-    // Requisição inicial sem limitar redirecionamentos
-    let response = await axios.get(URL_BASE, {
+    console.log(`Iniciando requisição para: ${URL_BASE}`);
+
+    const response = await axios.get(URL_BASE, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
       },
-      withCredentials: true,
-      jar,
+      maxRedirects: 5,  // permitir redirecionamentos
+      validateStatus: status => status >= 200 && status < 400,
+      responseType: 'text',
     });
 
-    // Se o conteúdo for HTML com token confirm, extrai o token
-    if (typeof response.data === 'string') {
-      const html = response.data;
-      const confirmMatch = html.match(/confirm=([0-9A-Za-z_-]+)&/);
-      const confirm = confirmMatch ? confirmMatch[1] : null;
+    console.log(`Resposta inicial recebida com status: ${response.status}`);
 
-      if (confirm) {
+    const data = response.data;
+
+    // Se a resposta parecer HTML e tiver token confirm, tenta extrair
+    if (typeof data === 'string' && data.includes('confirm=')) {
+      const confirmMatch = data.match(/confirm=([0-9A-Za-z_-]+)&/);
+
+      if (confirmMatch) {
+        const confirm = confirmMatch[1];
         const downloadUrl = `https://drive.google.com/uc?export=download&confirm=${confirm}&id=${FILE_ID}`;
+
         console.log('Token confirm encontrado:', confirm);
-        console.log('URL final de download:', downloadUrl);
+        console.log('URL final para download:', downloadUrl);
+
         await saveFile(downloadUrl);
         return;
       }
     }
 
-    // Se resposta já for o arquivo (stream)
+    // Se não achou token confirm, tenta salvar diretamente (arquivo pequeno)
+    console.log('Não encontrou token confirm, tentando salvar download direto...');
     await saveFile(URL_BASE);
 
-  } catch (error) {
-    console.error('Erro ao baixar o arquivo:', error.message);
+  } catch (err) {
+    console.error('Erro na função downloadFile:', err.message);
     process.exit(1);
   }
 }
 
 async function saveFile(url) {
-  console.log('Iniciando download do arquivo...');
+  console.log(`Iniciando download do arquivo a partir de: ${url}`);
+
   const writer = fs.createWriteStream(path.resolve(__dirname, 'video_drive.mp4'));
 
-  const response = await axios({
-    url,
-    method: 'GET',
-    responseType: 'stream',
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-    },
-  });
-
-  response.data.pipe(writer);
-
-  return new Promise((resolve, reject) => {
-    writer.on('finish', () => {
-      console.log('Download concluído: video_drive.mp4');
-      resolve();
+  try {
+    const response = await axios({
+      url,
+      method: 'GET',
+      responseType: 'stream',
+      maxRedirects: 5,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+      },
     });
-    writer.on('error', reject);
-  });
+
+    console.log(`Download iniciando com status: ${response.status}`);
+
+    response.data.pipe(writer);
+
+    await new Promise((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+
+    console.log('Download concluído: video_drive.mp4');
+  } catch (err) {
+    console.error('Erro ao salvar o arquivo:', err.message);
+    process.exit(1);
+  }
 }
 
 downloadFile();
