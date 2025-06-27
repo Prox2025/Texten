@@ -1,38 +1,23 @@
-name: Explorar e Baixar Vídeo Google Drive
+name: Download Google Drive Video
 
 on:
   workflow_dispatch:
-    inputs:
-      drive_url:
-        description: 'URL do Google Drive (com id=...)'
-        required: true
-        type: string
 
 jobs:
-  baixar-video:
+  download_video:
     runs-on: ubuntu-latest
-    env:
-      ACTIONS_STEP_DEBUG: true
 
     steps:
-      - name: Checkout do código
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Configurar Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: '18'
 
-      - name: Instalar dependências Node.js
-        run: npm install puppeteer axios fs-extra
+      - name: Install dependencies
+        run: npm install axios tough-cookie
 
-      - name: Executar script baixar.js para baixar vídeo
-        env:
-          DRIVE_URL: ${{ github.event.inputs.drive_url }}
-        run: node baixar.js
-
-      - name: Fazer upload do vídeo como artefato
-        uses: actions/upload-artifact@v4
-        with:
-          name: video-google-drive
-          path: video.mp4
+      - name: Run download script
+        run: node download.js
