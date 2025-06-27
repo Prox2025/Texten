@@ -1,46 +1,80 @@
-const puppeteer = require('puppeteer');
-const fs = require('fs');
 const axios = require('axios');
+const { CookieJar } = require('tough-cookie');
+const fs = require('fs');
+const path = require('path');
 
-(async () => {
+const FILE_ID = '1onC2WQkWOwAd-ywH9qvcRSCw2uotyplh';
+const URL_BASE = `https://drive.google.com/uc?export=download&id=${FILE_ID}`;
+
+const jar = new CookieJar();
+
+async function downloadFile() {
   try {
-    const url = process.env.DRIVE_URL;
-    console.log('🌐 Acessando: ' + url);
-
-    const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
-    const page = await browser.newPage();
-
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-
-    await page.waitForSelector('#uc-download-link', { timeout: 10000 });
-    const downloadLink = await page.$eval('#uc-download-link', el => el.href);
-
-    console.log('✅ Link extraído: ' + downloadLink);
-
-    const response = await page.goto(downloadLink, { waitUntil: 'networkidle2' });
-    const finalUrl = response.url();
-
-    console.log('🎯 Link final: ' + finalUrl);
-
-    const writer = fs.createWriteStream('video.mp4');
-    const videoResponse = await axios({
-      method: 'get',
-      url: finalUrl,
-      responseType: 'stream'
+    // Primeira requisição: pegar a página inicial (pode vir aviso)
+    let response = await axios.get(URL_BASE, {
+      maxRedirects: 0,
+      validateStatus: status => status === 200 || status === 302,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+      },
+      withCredentials: true,
+      jar,
     });
 
-    videoResponse.data.pipe(writer);
+    if (response.status === 302) {
+      const redirectUrl = response.headers.location;
+      if (redirectUrl) {
+        console.log('Download direto: ', redirectUrl);
+        await saveFile(redirectUrl);
+        return;
+      }
+    }
 
-    await new Promise((resolve, reject) => {
-      writer.on('finish', resolve);
-      writer.on('error', reject);
-    });
+    const html = response.data;
+    const confirmMatch = html.match(/confirm=([0-9A-Za-z_-]+)&/);
+    const confirm = confirmMatch ? confirmMatch[1] : null;
 
-    console.log('📥 Vídeo salvo como video.mp4');
+    if (!confirm) {
+      console.log('Não achou token confirm, tentando download direto...');
+      await saveFile(URL_BASE);
+      return;
+    }
 
-    await browser.close();
+    const downloadUrl = `https://drive.google.com/uc?export=download&confirm=${confirm}&id=${FILE_ID}`;
+
+    console.log('Token confirm encontrado:', confirm);
+    console.log('URL final de download:', downloadUrl);
+
+    await saveFile(downloadUrl);
+
   } catch (error) {
-    console.error('❌ Erro inesperado:', error);
+    console.error('Erro ao baixar o arquivo:', error.message);
     process.exit(1);
   }
-})();
+}
+
+async function saveFile(url) {
+  console.log('Iniciando download do arquivo...');
+  const writer = fs.createWriteStream(path.resolve(__dirname, 'video_drive.mp4'));
+
+  const response = await axios({
+    url,
+    method: 'GET',
+    responseType: 'stream',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+    },
+  });
+
+  response.data.pipe(writer);
+
+  return new Promise((resolve, reject) => {
+    writer.on('finish', () => {
+      console.log('Download concluído: video_drive.mp4');
+      resolve();
+    });
+    writer.on('error', reject);
+  });
+}
+
+downloadFile();
