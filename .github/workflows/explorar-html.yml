@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout do código
         uses: actions/checkout@v3
 
       - name: Instalar Node.js
@@ -16,12 +16,8 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Instalar dependências
+      - name: Instalar dependências Node.js
         run: npm install puppeteer fs-extra
-
-      - name: Criar script baixar.js
-        run: |
-          echo "" > baixar.js
 
       - name: Executar script de download
         run: node baixar.js
