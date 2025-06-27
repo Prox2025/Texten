@@ -1,43 +1,54 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs-extra');
-const axios = require('axios');
+const https = require('https');
 
 const url = 'https://drive.google.com/uc?id=1onC2WQkWOwAd-ywH9qvcRSCw2uotyplh&export=download';
 
 (async () => {
-  console.log('🚀 Iniciando navegador...');
+  console.log('🚀 Iniciando Puppeteer...');
   const browser = await puppeteer.launch({ headless: 'new' });
   const page = await browser.newPage();
 
-  console.log('🌐 Acessando link:', url);
+  console.log('🌍 Acessando URL:', url);
   await page.goto(url, { waitUntil: 'networkidle2' });
 
   try {
-    console.log('⏳ Esperando botão "Baixar de qualquer forma"...');
+    console.log('🔍 Procurando botão "Baixar de qualquer forma"...');
     await page.waitForSelector('a#uc-download-link', { timeout: 10000 });
 
-    const downloadLink = await page.$eval('a#uc-download-link', el => el.href);
-    console.log('✅ Link direto encontrado:', downloadLink);
+    const directLink = await page.$eval('a#uc-download-link', el => el.href);
+    console.log('✅ Link direto obtido:', directLink);
 
-    console.log('📥 Iniciando download via Axios...');
-    const response = await axios.get(downloadLink, { responseType: 'stream' });
+    const filename = 'video_baixado.mp4';
+    console.log('💾 Iniciando download com módulo HTTPS...');
 
-    const disposition = response.headers['content-disposition'] || '';
-    const match = disposition.match(/filename="(.+?)"/);
-    const filename = match ? match[1] : 'video_baixado.mp4';
+    const file = fs.createWriteStream(filename);
+    https.get(directLink, response => {
+      const totalSize = parseInt(response.headers['content-length'] || '0', 10);
+      let downloaded = 0;
 
-    const writer = fs.createWriteStream(filename);
-    response.data.pipe(writer);
+      response.on('data', chunk => {
+        downloaded += chunk.length;
+        const percent = ((downloaded / totalSize) * 100).toFixed(2);
+        process.stdout.write(`📦 Baixando... ${percent}%\r`);
+      });
 
-    await new Promise((resolve, reject) => {
-      writer.on('finish', resolve);
-      writer.on('error', reject);
+      response.pipe(file);
+
+      file.on('finish', () => {
+        console.log(`\n✅ Download finalizado: ${filename}`);
+        file.close();
+      });
+
+    }).on('error', err => {
+      fs.unlink(filename, () => {});
+      console.error('❌ Erro no download:', err.message);
     });
 
-    console.log('🎉 Download concluído:', filename);
   } catch (err) {
-    console.error('❌ Erro durante o download:', err.message);
+    console.error('❌ Erro no processo:', err.message);
   } finally {
+    await new Promise(r => setTimeout(r, 5000)); // aguardar download
     await browser.close();
   }
 })();
