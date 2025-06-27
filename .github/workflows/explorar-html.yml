@@ -1,0 +1,48 @@
+name: Explorar HTML Google Drive
+
+on:
+  workflow_dispatch:
+    inputs:
+      drive_url:
+        description: 'URL do Google Drive (com id=...)'
+        required: true
+        type: string
+
+jobs:
+  explorar-html:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Instalar dependências
+        run: npm install puppeteer
+
+      - name: Criar script de exploração
+        run: |
+          echo "const puppeteer = require('puppeteer');
+
+          (async () => {
+            const url = process.env.DRIVE_URL;
+            const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+            const page = await browser.newPage();
+
+            await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+            const html = await page.content();
+
+            console.log('🔍 HTML da página carregada:');
+            console.log(html.slice(0, 15000)); // limitar para evitar travar o log
+
+            await browser.close();
+          })();" > explorar.js
+
+      - name: Executar Puppeteer e mostrar HTML
+        env:
+          DRIVE_URL: ${{ github.event.inputs.drive_url }}
+        run: node explorar.js
