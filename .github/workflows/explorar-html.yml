@@ -17,7 +17,7 @@ jobs:
           node-version: '18'
 
       - name: Instalar dependências
-        run: npm install puppeteer fs-extra axios
+        run: npm install puppeteer fs-extra
 
       - name: Criar script baixar.js
         run: |
