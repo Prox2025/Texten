@@ -16,6 +16,17 @@ const path = require("path");
   const browser = await puppeteer.launch({ headless: "new", args: ['--no-sandbox'] });
   const page = await browser.newPage();
 
+  let downloadUrl = null;
+
+  // Escutar respostas para capturar a URL real do download
+  page.on('response', async (response) => {
+    const headers = response.headers();
+    if (headers['content-disposition'] && headers['content-disposition'].includes('attachment')) {
+      downloadUrl = response.url();
+      console.log(`⚡ Capturada URL de download: ${downloadUrl}`);
+    }
+  });
+
   console.log(`🌍 Acessando URL: ${url}`);
   await page.goto(url, { waitUntil: "networkidle2" });
 
@@ -23,21 +34,19 @@ const path = require("path");
     console.log("⏳ Aguardando botão de download...");
     await page.waitForSelector('#uc-download-link', { timeout: 15000 });
 
-    console.log("🖱️ Clicando no botão para gerar link...");
+    console.log("🖱️ Clicando no botão para iniciar download...");
     await page.click('#uc-download-link');
 
-    console.log("⏳ Esperando 3 segundos após clique...");
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    console.log("🔎 Extraindo href do botão novamente...");
-    const href = await page.$eval('#uc-download-link', el => el.getAttribute('href'));
-
-    if (!href) {
-      throw new Error("⚠️ HREF do botão não encontrado após clique.");
+    console.log("⏳ Aguardando resposta de download...");
+    // Espera até capturar o downloadUrl ou timeout em 10s
+    const start = Date.now();
+    while (!downloadUrl && (Date.now() - start) < 10000) {
+      await new Promise(r => setTimeout(r, 200));
     }
 
-    const linkReal = `https://drive.google.com${href.replace(/&amp;/g, "&")}`;
-    console.log(`✅ Link de download extraído: ${linkReal}`);
+    if (!downloadUrl) {
+      throw new Error("❌ Não capturou URL de download na resposta.");
+    }
 
     await browser.close();
 
@@ -45,8 +54,8 @@ const path = require("path");
     await fs.ensureDir(pasta);
     const nomeArquivo = path.join(pasta, `video_${Date.now()}.mp4`);
 
-    console.log("⬇️ Baixando vídeo...");
-    const response = await axios.get(linkReal, { responseType: 'stream' });
+    console.log("⬇️ Baixando vídeo com Axios...");
+    const response = await axios.get(downloadUrl, { responseType: 'stream' });
     const writer = fs.createWriteStream(nomeArquivo);
     response.data.pipe(writer);
 
@@ -56,6 +65,7 @@ const path = require("path");
     });
 
     console.log(`✅ Vídeo salvo em: ${nomeArquivo}`);
+
   } catch (err) {
     console.error("❌ Erro:", err.message);
     await browser.close();
