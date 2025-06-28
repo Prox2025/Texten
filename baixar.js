@@ -18,7 +18,7 @@ const path = require("path");
 
   let linkReal = null;
 
-  // Interceptar as requisições feitas pela página
+  // Interceptar requisições
   page.on('request', (request) => {
     const reqUrl = request.url();
     if (reqUrl.includes("uc?export=download") && reqUrl.includes("confirm=") && reqUrl.includes("id=")) {
@@ -34,25 +34,23 @@ const path = require("path");
     await page.waitForSelector('#uc-download-link', { timeout: 15000 });
 
     console.log("🖱️ Clicando no botão de download...");
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'networkidle2' }),
-      page.click('#uc-download-link')
-    ]);
+    await page.click('#uc-download-link');
 
-    await new Promise(resolve => setTimeout(resolve, 3000)); // aguarda redirecionamento final
+    console.log("⏳ Aguardando interceptação da requisição...");
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
     if (!linkReal) {
-      throw new Error("⚠️ Link de download não interceptado.");
+      throw new Error("⚠️ Link de download não foi interceptado.");
     }
 
-    console.log(`✅ Link interceptado: ${linkReal}`);
+    console.log(`✅ Link real interceptado: ${linkReal}`);
     await browser.close();
 
     const pasta = path.join(__dirname, "stream");
     await fs.ensureDir(pasta);
     const nomeArquivo = path.join(pasta, `video_${Date.now()}.mp4`);
 
-    console.log("⬇️ Iniciando download com Axios...");
+    console.log("⬇️ Iniciando download...");
     const response = await axios.get(linkReal, { responseType: 'stream' });
     const writer = fs.createWriteStream(nomeArquivo);
     response.data.pipe(writer);
