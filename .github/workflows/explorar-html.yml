@@ -1,31 +1,24 @@
-name: Baixar Vídeo do Google Drive
+# .github/workflows/horario.yml
+name: Enviar Hora Moçambique com Puppeteer
 
 on:
-  workflow_dispatch:
-    inputs:
-      video_id:
-        description: 'ID do vídeo do Google Drive'
-        required: true
+  workflow_dispatch:  # Permite execução manual no GitHub
 
 jobs:
-  baixar:
+  enviar-hora:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
 
-      - name: Instalar dependências Node.js
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgbm-dev
-          npm install puppeteer axios fs-extra
-
-      - name: Executar script para baixar vídeo
-        run: node baixar.js ${{ github.event.inputs.video_id }}
-
-      - name: Publicar vídeo como artefato
-        uses: actions/upload-artifact@v4
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
         with:
-          name: video_baixado
-          path: stream/*.mp4
+          node-version: '20'
+
+      - name: Instalar Puppeteer
+        run: npm install puppeteer
+
+      - name: Executar Script de Hora
+        run: node horario.js
