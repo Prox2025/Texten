@@ -1,70 +1,46 @@
-const puppeteer = require('puppeteer');
-const fs = require('fs-extra');
-const https = require('https');
-
-const url = 'https://drive.google.com/uc?id=1onC2WQkWOwAd-ywH9qvcRSCw2uotyplh&export=download';
+const puppeteer = require("puppeteer");
+const fs = require("fs-extra");
+const axios = require("axios");
+const path = require("path");
 
 (async () => {
-  console.log('🚀 Iniciando Puppeteer...');
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-
-  const page = await browser.newPage();
-  console.log('🌍 Acessando URL:', url);
-  await page.goto(url, { waitUntil: 'networkidle0' });
-
-  // Espera extra para garantir carregamento total
-  await page.waitForTimeout(3000);
-
-  console.log('🔎 Procurando links de download no HTML da página...');
-  // Busca todos os links <a> com href contendo /uc?export=download&
-  const possibleLinks = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll('a[href*="/uc?export=download&"]'))
-      .map(a => a.href);
-  });
-
-  if (possibleLinks.length === 0) {
-    console.error('❌ Nenhum link de download encontrado na página!');
-    await browser.close();
+  const videoId = process.argv[2];
+  if (!videoId) {
+    console.error("❌ Nenhum ID de vídeo fornecido.");
     process.exit(1);
   }
 
-  console.log(`✅ Encontrados ${possibleLinks.length} link(s) de download:`);
-  possibleLinks.forEach((link, i) => console.log(`  ${i + 1}: ${link}`));
+  const url = `https://drive.google.com/uc?id=${videoId}&export=download`;
 
-  // Usaremos o primeiro link encontrado para download
-  const directLink = possibleLinks[0];
-  console.log('➡️ Usando o primeiro link para download:', directLink);
+  console.log("🚀 Iniciando Puppeteer...");
+  const browser = await puppeteer.launch({ headless: "new", args: ['--no-sandbox'] });
+  const page = await browser.newPage();
+  await page.goto(url, { waitUntil: "networkidle2" });
 
-  const filename = 'video_baixado.mp4';
-  console.log('💾 Iniciando download com módulo HTTPS...');
+  console.log("🔍 Procurando botão de confirmação...");
+  const linkReal = await page.$eval('#uc-download-link', el => el.href);
+  console.log(`✅ Link real encontrado: ${linkReal}`);
 
-  const file = fs.createWriteStream(filename);
+  await browser.close();
 
-  https.get(directLink, response => {
-    const totalSize = parseInt(response.headers['content-length'] || '0', 10);
-    let downloaded = 0;
+  // Criar pasta stream
+  const pasta = path.join(__dirname, "stream");
+  await fs.ensureDir(pasta);
 
-    response.on('data', chunk => {
-      downloaded += chunk.length;
-      const percent = totalSize ? ((downloaded / totalSize) * 100).toFixed(2) : '...';
-      process.stdout.write(`📦 Baixando... ${percent}%\r`);
-    });
+  const nomeArquivo = path.join(pasta, `video_${Date.now()}.mp4`);
+  console.log("⬇️ Baixando vídeo...");
 
-    response.pipe(file);
-
-    file.on('finish', () => {
-      console.log(`\n✅ Download finalizado: ${filename}`);
-      file.close();
-      browser.close();
-    });
-
-  }).on('error', err => {
-    fs.unlink(filename, () => {});
-    console.error('❌ Erro no download:', err.message);
-    browser.close();
+  const response = await axios.get(linkReal, {
+    responseType: 'stream',
   });
 
+  const writer = fs.createWriteStream(nomeArquivo);
+  response.data.pipe(writer);
+
+  await new Promise((resolve, reject) => {
+    writer.on("finish", resolve);
+    writer.on("error", reject);
+  });
+
+  console.log(`✅ Vídeo salvo em: ${nomeArquivo}`);
 })();
