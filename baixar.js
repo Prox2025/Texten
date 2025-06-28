@@ -23,10 +23,17 @@ const path = require("path");
     console.log("⏳ Aguardando botão de download...");
     await page.waitForSelector('#uc-download-link', { timeout: 15000 });
 
-    // ⬇️ Agora extraímos o href diretamente do botão:
+    console.log("🖱️ Clicando no botão para gerar link...");
+    await page.click('#uc-download-link');
+
+    console.log("⏳ Esperando 3 segundos após clique...");
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    console.log("🔎 Extraindo href do botão novamente...");
     const href = await page.$eval('#uc-download-link', el => el.getAttribute('href'));
+
     if (!href) {
-      throw new Error("⚠️ HREF do botão não encontrado.");
+      throw new Error("⚠️ HREF do botão não encontrado após clique.");
     }
 
     const linkReal = `https://drive.google.com${href.replace(/&amp;/g, "&")}`;
