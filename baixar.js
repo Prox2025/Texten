@@ -5,7 +5,6 @@ const path = require("path");
 
 (async () => {
   const entrada = process.argv[2];
-
   if (!entrada) {
     console.error("❌ Nenhum ID ou URL fornecido.");
     process.exit(1);
@@ -17,33 +16,43 @@ const path = require("path");
   const browser = await puppeteer.launch({ headless: "new", args: ['--no-sandbox'] });
   const page = await browser.newPage();
 
+  let linkReal = null;
+
+  // Interceptar as requisições feitas pela página
+  page.on('request', (request) => {
+    const reqUrl = request.url();
+    if (reqUrl.includes("uc?export=download") && reqUrl.includes("confirm=") && reqUrl.includes("id=")) {
+      linkReal = reqUrl;
+    }
+  });
+
   console.log(`🌍 Acessando URL: ${url}`);
   await page.goto(url, { waitUntil: "networkidle2" });
 
   try {
-    console.log("⏳ Esperando seletor de download...");
+    console.log("⏳ Aguardando botão de download...");
     await page.waitForSelector('#uc-download-link', { timeout: 15000 });
 
-    console.log("📄 Extraindo HTML completo...");
-    const html = await page.content();
+    console.log("🖱️ Clicando no botão de download...");
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle2' }),
+      page.click('#uc-download-link')
+    ]);
 
-    const match = html.match(/id="uc-download-link"\s+href="([^"]+)"/);
-    if (!match || !match[1]) {
-      throw new Error("❌ Link de download não encontrado no HTML.");
+    await new Promise(resolve => setTimeout(resolve, 3000)); // aguarda redirecionamento final
+
+    if (!linkReal) {
+      throw new Error("⚠️ Link de download não interceptado.");
     }
 
-    const linkParcial = match[1].replace(/&amp;/g, "&");
-    const linkReal = `https://drive.google.com${linkParcial}`;
-
-    console.log(`✅ Link real obtido: ${linkReal}`);
-
+    console.log(`✅ Link interceptado: ${linkReal}`);
     await browser.close();
 
     const pasta = path.join(__dirname, "stream");
     await fs.ensureDir(pasta);
     const nomeArquivo = path.join(pasta, `video_${Date.now()}.mp4`);
 
-    console.log("⬇️ Iniciando download...");
+    console.log("⬇️ Iniciando download com Axios...");
     const response = await axios.get(linkReal, { responseType: 'stream' });
     const writer = fs.createWriteStream(nomeArquivo);
     response.data.pipe(writer);
@@ -55,7 +64,7 @@ const path = require("path");
 
     console.log(`✅ Vídeo salvo em: ${nomeArquivo}`);
   } catch (err) {
-    console.error("❌ Erro ao capturar o link de download:", err.message);
+    console.error("❌ Erro:", err.message);
     await browser.close();
     process.exit(1);
   }
