@@ -2,22 +2,24 @@ name: Baixar Vídeo do Google Drive
 
 on:
   workflow_dispatch:
+    inputs:
+      video_id:
+        description: 'ID do vídeo do Google Drive'
+        required: true
 
 jobs:
   baixar:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout do código
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Instalar Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-
       - name: Instalar dependências Node.js
-        run: npm install puppeteer fs-extra
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgbm-dev
+          npm install puppeteer axios fs-extra
 
-      - name: Executar script de download
-        run: node baixar.js
+      - name: Executar script para baixar vídeo
+        run: node baixar.js ${{ github.event.inputs.video_id }}
