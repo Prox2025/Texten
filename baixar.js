@@ -18,7 +18,6 @@ const path = require("path");
 
   let downloadUrl = null;
 
-  // Escutar respostas para capturar a URL real do download
   page.on('response', async (response) => {
     const headers = response.headers();
     if (headers['content-disposition'] && headers['content-disposition'].includes('attachment')) {
@@ -34,19 +33,16 @@ const path = require("path");
     console.log("⏳ Aguardando botão de download...");
     await page.waitForSelector('#uc-download-link', { timeout: 15000 });
 
-    console.log("🖱️ Clicando no botão para iniciar download...");
+    console.log("🖱️ Clicando no botão de download...");
     await page.click('#uc-download-link');
 
     console.log("⏳ Aguardando resposta de download...");
-    // Espera até capturar o downloadUrl ou timeout em 10s
     const start = Date.now();
     while (!downloadUrl && (Date.now() - start) < 10000) {
       await new Promise(r => setTimeout(r, 200));
     }
 
-    if (!downloadUrl) {
-      throw new Error("❌ Não capturou URL de download na resposta.");
-    }
+    if (!downloadUrl) throw new Error("❌ Link não capturado.");
 
     await browser.close();
 
@@ -54,9 +50,12 @@ const path = require("path");
     await fs.ensureDir(pasta);
     const nomeArquivo = path.join(pasta, `video_${Date.now()}.mp4`);
 
-    console.log("⬇️ Baixando vídeo com Axios...");
+    console.log("⬇️ Baixando vídeo...");
     const response = await axios.get(downloadUrl, { responseType: 'stream' });
     const writer = fs.createWriteStream(nomeArquivo);
+
+    let totalBytes = 0;
+    response.data.on('data', chunk => totalBytes += chunk.length);
     response.data.pipe(writer);
 
     await new Promise((resolve, reject) => {
@@ -64,8 +63,10 @@ const path = require("path");
       writer.on("error", reject);
     });
 
-    console.log(`✅ Vídeo salvo em: ${nomeArquivo}`);
-
+    const tamanhoMB = (totalBytes / (1024 * 1024)).toFixed(2);
+    console.log(`✅ Vídeo salvo: ${nomeArquivo}`);
+    console.log(`📦 Tamanho: ${tamanhoMB} MB`);
+    console.log(`🔗 Link direto (navegador): ${downloadUrl}`);
   } catch (err) {
     console.error("❌ Erro:", err.message);
     await browser.close();
