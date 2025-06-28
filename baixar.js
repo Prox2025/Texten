@@ -21,26 +21,29 @@ const path = require("path");
   await page.goto(url, { waitUntil: "networkidle2" });
 
   try {
-    console.log("⏳ Esperando link de download aparecer...");
+    console.log("⏳ Esperando seletor de download...");
     await page.waitForSelector('#uc-download-link', { timeout: 15000 });
 
-    const linkReal = await page.$eval('#uc-download-link', el => el.href);
+    console.log("📄 Extraindo HTML completo...");
+    const html = await page.content();
 
-    if (!linkReal) {
-      throw new Error("Link de download vazio.");
+    const match = html.match(/id="uc-download-link"\s+href="([^"]+)"/);
+    if (!match || !match[1]) {
+      throw new Error("❌ Link de download não encontrado no HTML.");
     }
 
-    console.log(`✅ Link real de download encontrado: ${linkReal}`);
+    const linkParcial = match[1].replace(/&amp;/g, "&");
+    const linkReal = `https://drive.google.com${linkParcial}`;
+
+    console.log(`✅ Link real obtido: ${linkReal}`);
 
     await browser.close();
 
-    // Criar pasta e preparar nome do arquivo
     const pasta = path.join(__dirname, "stream");
     await fs.ensureDir(pasta);
     const nomeArquivo = path.join(pasta, `video_${Date.now()}.mp4`);
 
-    console.log("⬇️ Baixando vídeo...");
-
+    console.log("⬇️ Iniciando download...");
     const response = await axios.get(linkReal, { responseType: 'stream' });
     const writer = fs.createWriteStream(nomeArquivo);
     response.data.pipe(writer);
