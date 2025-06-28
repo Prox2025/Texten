@@ -16,16 +16,6 @@ const path = require("path");
   const browser = await puppeteer.launch({ headless: "new", args: ['--no-sandbox'] });
   const page = await browser.newPage();
 
-  let linkReal = null;
-
-  // Interceptar requisições
-  page.on('request', (request) => {
-    const reqUrl = request.url();
-    if (reqUrl.includes("uc?export=download") && reqUrl.includes("confirm=") && reqUrl.includes("id=")) {
-      linkReal = reqUrl;
-    }
-  });
-
   console.log(`🌍 Acessando URL: ${url}`);
   await page.goto(url, { waitUntil: "networkidle2" });
 
@@ -33,24 +23,22 @@ const path = require("path");
     console.log("⏳ Aguardando botão de download...");
     await page.waitForSelector('#uc-download-link', { timeout: 15000 });
 
-    console.log("🖱️ Clicando no botão de download...");
-    await page.click('#uc-download-link');
-
-    console.log("⏳ Aguardando interceptação da requisição...");
-    await new Promise(resolve => setTimeout(resolve, 5000));
-
-    if (!linkReal) {
-      throw new Error("⚠️ Link de download não foi interceptado.");
+    // ⬇️ Agora extraímos o href diretamente do botão:
+    const href = await page.$eval('#uc-download-link', el => el.getAttribute('href'));
+    if (!href) {
+      throw new Error("⚠️ HREF do botão não encontrado.");
     }
 
-    console.log(`✅ Link real interceptado: ${linkReal}`);
+    const linkReal = `https://drive.google.com${href.replace(/&amp;/g, "&")}`;
+    console.log(`✅ Link de download extraído: ${linkReal}`);
+
     await browser.close();
 
     const pasta = path.join(__dirname, "stream");
     await fs.ensureDir(pasta);
     const nomeArquivo = path.join(pasta, `video_${Date.now()}.mp4`);
 
-    console.log("⬇️ Iniciando download...");
+    console.log("⬇️ Baixando vídeo...");
     const response = await axios.get(linkReal, { responseType: 'stream' });
     const writer = fs.createWriteStream(nomeArquivo);
     response.data.pipe(writer);
