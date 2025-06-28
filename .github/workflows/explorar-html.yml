@@ -23,3 +23,9 @@ jobs:
 
       - name: Executar script para baixar vídeo
         run: node baixar.js ${{ github.event.inputs.video_id }}
+
+      - name: Publicar vídeo como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: video_baixado
+          path: stream/*.mp4
