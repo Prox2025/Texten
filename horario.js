@@ -1,6 +1,6 @@
 const puppeteer = require('puppeteer');
 
-const SERVER_STATUS_URL = 'https://livestream.ct.ws/Google drive/live/status.php';
+const SERVER_STATUS_URL = 'https://livestream.ct.ws/Google%20drive/live/status.php';
 
 (async () => {
   const browser = await puppeteer.launch({
