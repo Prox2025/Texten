@@ -1,4 +1,3 @@
-// horario.js
 const puppeteer = require('puppeteer');
 
 const SERVER_STATUS_URL = 'https://livestream.ct.ws/Google drive/live/status.php';
@@ -12,7 +11,6 @@ const SERVER_STATUS_URL = 'https://livestream.ct.ws/Google drive/live/status.php
   try {
     const page = await browser.newPage();
 
-    // Define o fuso horário para Moçambique
     await page.emulateTimezone('Africa/Maputo');
 
     console.log(`🌐 Acessando ${SERVER_STATUS_URL}`);
@@ -21,10 +19,9 @@ const SERVER_STATUS_URL = 'https://livestream.ct.ws/Google drive/live/status.php
       timeout: 60000
     });
 
-    // Aguarda carregamento de JS injetado
-    await page.waitForTimeout(3000);
+    // Substitui page.waitForTimeout para compatibilidade
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Coleta a hora atual em Maputo
     const data = await page.evaluate(() => {
       const agora = new Date();
       return {
@@ -37,7 +34,6 @@ const SERVER_STATUS_URL = 'https://livestream.ct.ws/Google drive/live/status.php
 
     console.log("🕒 Hora detectada no navegador:", data.hora);
 
-    // Envia ao servidor via POST
     const resposta = await page.evaluate(async (payload) => {
       const res = await fetch(window.location.href, {
         method: 'POST',
