@@ -1,0 +1,32 @@
+name: Montar vídeo do Google Drive
+
+on:
+  workflow_dispatch:
+
+jobs:
+  montar-video:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar o repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências
+        run: |
+          sudo apt update
+          sudo apt install -y ffmpeg nodejs npm
+
+      - name: Instalar googleapis
+        run: npm install googleapis
+
+      - name: Executar script
+        run: node unir.js
+        env:
+          KEYFILE: chave.json
+          INPUTFILE: input.json
+
+      - name: Upload do vídeo final
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-final
+          path: video_unido.mp4
