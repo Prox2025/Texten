@@ -8,10 +8,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clonar o repositório
+      - name: Clonar repositório
         uses: actions/checkout@v4
 
-      - name: Instalar dependências
+      - name: Instalar FFmpeg e Node.js
         run: |
           sudo apt update
           sudo apt install -y ffmpeg nodejs npm
@@ -19,13 +19,25 @@ jobs:
       - name: Instalar googleapis
         run: npm install googleapis
 
-      - name: Executar script
+      - name: Ler payload e criar chave.json + input.json
+        run: |
+          node -e "
+            const fs = require('fs');
+            const payload = JSON.parse(fs.readFileSync('payload.json'));
+            fs.writeFileSync('chave.json', JSON.stringify(payload.chave, null, 2));
+            fs.writeFileSync('input.json', JSON.stringify({
+              video_principal: payload.video_principal,
+              videos_opcionais: payload.videos_opcionais
+            }, null, 2));
+          "
+
+      - name: Executar script de montagem
         run: node unir.js
         env:
           KEYFILE: chave.json
           INPUTFILE: input.json
 
-      - name: Upload do vídeo final
+      - name: Upload vídeo final
         uses: actions/upload-artifact@v4
         with:
           name: video-final
