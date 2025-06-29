@@ -2,42 +2,68 @@ name: Montar vídeo do Google Drive
 
 on:
   workflow_dispatch:
+    inputs:
+      video_drive_id:
+        description: 'ID do vídeo principal no Google Drive'
+        required: true
+        type: string
+      chave_json:
+        description: 'Chave JSON da conta de serviço Google (em linha única JSON escapado)'
+        required: true
+        type: string
+      video_extra_1:
+        description: 'ID vídeo extra 1 (opcional)'
+        required: false
+        type: string
+      video_extra_2:
+        description: 'ID vídeo extra 2 (opcional)'
+        required: false
+        type: string
+      video_extra_3:
+        description: 'ID vídeo extra 3 (opcional)'
+        required: false
+        type: string
 
 jobs:
   montar-video:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clonar repositório
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Instalar FFmpeg e Node.js
+      - name: Criar input.json a partir dos inputs
+        run: |
+          echo '{
+            "video_principal": "${{ github.event.inputs.video_drive_id }}",
+            "chave": ${{ github.event.inputs.chave_json }},
+            "videos_opcionais": [
+              $([[ -n "${{ github.event.inputs.video_extra_1 }}" ]] && echo "\"${{ github.event.inputs.video_extra_1 }}\","),
+              $([[ -n "${{ github.event.inputs.video_extra_2 }}" ]] && echo "\"${{ github.event.inputs.video_extra_2 }}\","),
+              $([[ -n "${{ github.event.inputs.video_extra_3 }}" ]] && echo "\"${{ github.event.inputs.video_extra_3 }}\"")
+            ]
+          }' | jq '.' > input.json
+
+      - name: Mostrar input.json gerado
+        run: cat input.json
+
+      - name: Instalar dependências e FFmpeg
         run: |
           sudo apt update
           sudo apt install -y ffmpeg nodejs npm
+          npm install googleapis
 
-      - name: Instalar googleapis
-        run: npm install googleapis
-
-      - name: Ler payload e criar chave.json + input.json
+      - name: Gerar chave.json separada
         run: |
-          node -e "
-            const fs = require('fs');
-            const payload = JSON.parse(fs.readFileSync('payload.json'));
-            fs.writeFileSync('chave.json', JSON.stringify(payload.chave, null, 2));
-            fs.writeFileSync('input.json', JSON.stringify({
-              video_principal: payload.video_principal,
-              videos_opcionais: payload.videos_opcionais
-            }, null, 2));
-          "
+          jq '.chave' input.json > chave.json
 
-      - name: Executar script de montagem
+      - name: Executar script unir.js
         run: node unir.js
         env:
           KEYFILE: chave.json
           INPUTFILE: input.json
 
-      - name: Upload vídeo final
+      - name: Upload do vídeo final
         uses: actions/upload-artifact@v4
         with:
           name: video-final
