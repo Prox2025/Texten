@@ -7,8 +7,8 @@ on:
         description: 'ID do vídeo principal no Google Drive'
         required: true
         type: string
-      chave_json:
-        description: 'Chave JSON da conta de serviço Google (JSON como string única)'
+      chave_base64:
+        description: 'Chave JSON codificada em Base64'
         required: true
         type: string
       video_extra_1:
@@ -32,21 +32,23 @@ jobs:
       - name: 🔽 Clonar repositório
         uses: actions/checkout@v4
 
-      - name: 🧾 Criar input.json com segurança
+      - name: 🔐 Decodificar chave_base64 e salvar chave.json
+        run: |
+          echo "${{ github.event.inputs.chave_base64 }}" | base64 -d > chave.json
+
+      - name: 🧾 Criar input.json completo
         run: |
           printf '{
             "video_principal": "%s",
-            "chave": %s,
             "videos_opcionais": [%s%s%s]
           }\n' \
           "${{ github.event.inputs.video_drive_id }}" \
-          "${{ github.event.inputs.chave_json }}" \
           "${{ github.event.inputs.video_extra_1 && format('\"{0}\"', github.event.inputs.video_extra_1) || '' }}" \
           "${{ github.event.inputs.video_extra_2 && format(', \"{0}\"', github.event.inputs.video_extra_2) || '' }}" \
           "${{ github.event.inputs.video_extra_3 && format(', \"{0}\"', github.event.inputs.video_extra_3) || '' }}" \
           > input.json
 
-      - name: 📂 Mostrar conteúdo do input.json
+      - name: 📂 Mostrar input.json
         run: cat input.json
 
       - name: ⚙️ Instalar dependências
@@ -54,9 +56,6 @@ jobs:
           sudo apt update
           sudo apt install -y ffmpeg nodejs npm
           npm install googleapis
-
-      - name: 🔐 Gerar chave.json separada
-        run: jq '.chave' input.json > chave.json
 
       - name: 🧠 Executar script unir.js
         run: node unir.js
