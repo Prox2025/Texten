@@ -8,19 +8,19 @@ on:
         required: true
         type: string
       chave_json:
-        description: 'Chave JSON da conta de serviço Google (em linha única JSON escapado)'
+        description: 'Chave JSON da conta de serviço Google (JSON como string única)'
         required: true
         type: string
       video_extra_1:
-        description: 'ID vídeo extra 1 (opcional)'
+        description: 'ID do vídeo extra 1 (opcional)'
         required: false
         type: string
       video_extra_2:
-        description: 'ID vídeo extra 2 (opcional)'
+        description: 'ID do vídeo extra 2 (opcional)'
         required: false
         type: string
       video_extra_3:
-        description: 'ID vídeo extra 3 (opcional)'
+        description: 'ID do vídeo extra 3 (opcional)'
         required: false
         type: string
 
@@ -29,41 +29,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: 🔽 Clonar repositório
         uses: actions/checkout@v4
 
-      - name: Criar input.json a partir dos inputs
+      - name: 🧾 Criar input.json com segurança
         run: |
-          echo '{
-            "video_principal": "${{ github.event.inputs.video_drive_id }}",
-            "chave": ${{ github.event.inputs.chave_json }},
-            "videos_opcionais": [
-              $([[ -n "${{ github.event.inputs.video_extra_1 }}" ]] && echo "\"${{ github.event.inputs.video_extra_1 }}\","),
-              $([[ -n "${{ github.event.inputs.video_extra_2 }}" ]] && echo "\"${{ github.event.inputs.video_extra_2 }}\","),
-              $([[ -n "${{ github.event.inputs.video_extra_3 }}" ]] && echo "\"${{ github.event.inputs.video_extra_3 }}\"")
-            ]
-          }' | jq '.' > input.json
+          printf '{
+            "video_principal": "%s",
+            "chave": %s,
+            "videos_opcionais": [%s%s%s]
+          }\n' \
+          "${{ github.event.inputs.video_drive_id }}" \
+          "${{ github.event.inputs.chave_json }}" \
+          "${{ github.event.inputs.video_extra_1 && format('\"{0}\"', github.event.inputs.video_extra_1) || '' }}" \
+          "${{ github.event.inputs.video_extra_2 && format(', \"{0}\"', github.event.inputs.video_extra_2) || '' }}" \
+          "${{ github.event.inputs.video_extra_3 && format(', \"{0}\"', github.event.inputs.video_extra_3) || '' }}" \
+          > input.json
 
-      - name: Mostrar input.json gerado
+      - name: 📂 Mostrar conteúdo do input.json
         run: cat input.json
 
-      - name: Instalar dependências e FFmpeg
+      - name: ⚙️ Instalar dependências
         run: |
           sudo apt update
           sudo apt install -y ffmpeg nodejs npm
           npm install googleapis
 
-      - name: Gerar chave.json separada
-        run: |
-          jq '.chave' input.json > chave.json
+      - name: 🔐 Gerar chave.json separada
+        run: jq '.chave' input.json > chave.json
 
-      - name: Executar script unir.js
+      - name: 🧠 Executar script unir.js
         run: node unir.js
         env:
           KEYFILE: chave.json
           INPUTFILE: input.json
 
-      - name: Upload do vídeo final
+      - name: 📤 Upload do vídeo final
         uses: actions/upload-artifact@v4
         with:
           name: video-final
