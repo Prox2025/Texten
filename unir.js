@@ -6,7 +6,6 @@ const keyFile = process.env.KEYFILE || 'chave.json';
 const inputFile = process.env.INPUTFILE || 'input.json';
 const SCOPES = ['https://www.googleapis.com/auth/drive.readonly'];
 
-// Função para rodar ffmpeg
 function executarFFmpeg(args) {
   return new Promise((resolve, reject) => {
     const proc = spawn('ffmpeg', args, { stdio: 'inherit' });
@@ -17,26 +16,23 @@ function executarFFmpeg(args) {
   });
 }
 
-// Autenticação Google API
 async function autenticar() {
   const auth = new google.auth.GoogleAuth({ keyFile, scopes: SCOPES });
   return await auth.getClient();
 }
 
-// Baixar arquivo do Drive
 async function baixarArquivo(fileId, destino, auth) {
   const drive = google.drive({ version: 'v3', auth });
   const res = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' });
 
   return new Promise((resolve, reject) => {
-    const dest = fs.createWriteStream(destino);
+    const dest = fs.createWriteStream(dest);
     res.data.pipe(dest);
     res.data.on('end', resolve);
     res.data.on('error', reject);
   });
 }
 
-// Obter duração do vídeo com ffprobe
 function obterDuracao(video) {
   return new Promise((resolve, reject) => {
     const ffprobe = spawn('ffprobe', [
@@ -45,7 +41,6 @@ function obterDuracao(video) {
       '-of', 'default=noprint_wrappers=1:nokey=1',
       video
     ]);
-
     let output = '';
     ffprobe.stdout.on('data', chunk => output += chunk.toString());
     ffprobe.on('close', code => {
@@ -55,13 +50,11 @@ function obterDuracao(video) {
   });
 }
 
-// Corta vídeo em duas partes (sem reencodar)
 async function cortarVideo(input, out1, out2, meio) {
   await executarFFmpeg(['-i', input, '-t', meio.toString(), '-c', 'copy', out1]);
   await executarFFmpeg(['-i', input, '-ss', meio.toString(), '-c', 'copy', out2]);
 }
 
-// Reencoda vídeo para compatibilidade e padrão
 async function reencode(input, output) {
   await executarFFmpeg([
     '-i', input,
@@ -74,7 +67,6 @@ async function reencode(input, output) {
   ]);
 }
 
-// Une vídeos pela concatenação do ffmpeg
 async function unirVideos(lista, saida) {
   const txt = 'list.txt';
   fs.writeFileSync(txt, lista.map(f => `file '${f}'`).join('\n'));
