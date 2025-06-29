@@ -6,6 +6,7 @@ const keyFile = process.env.KEYFILE || 'chave.json';
 const inputFile = process.env.INPUTFILE || 'input.json';
 const SCOPES = ['https://www.googleapis.com/auth/drive.readonly'];
 
+// Executa comando FFmpeg
 function executarFFmpeg(args) {
   return new Promise((resolve, reject) => {
     const proc = spawn('ffmpeg', args, { stdio: 'inherit' });
@@ -16,23 +17,26 @@ function executarFFmpeg(args) {
   });
 }
 
+// Autenticação Google Drive
 async function autenticar() {
   const auth = new google.auth.GoogleAuth({ keyFile, scopes: SCOPES });
   return await auth.getClient();
 }
 
+// Baixa arquivo do Google Drive
 async function baixarArquivo(fileId, destino, auth) {
   const drive = google.drive({ version: 'v3', auth });
   const res = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' });
 
   return new Promise((resolve, reject) => {
-    const dest = fs.createWriteStream(dest);
-    res.data.pipe(dest);
-    res.data.on('end', resolve);
-    res.data.on('error', reject);
+    const output = fs.createWriteStream(destino);
+    res.data.pipe(output);
+    res.data.on('end', () => resolve());
+    res.data.on('error', err => reject(err));
   });
 }
 
+// Retorna duração de um vídeo
 function obterDuracao(video) {
   return new Promise((resolve, reject) => {
     const ffprobe = spawn('ffprobe', [
@@ -50,11 +54,13 @@ function obterDuracao(video) {
   });
 }
 
+// Corta vídeo em duas partes
 async function cortarVideo(input, out1, out2, meio) {
   await executarFFmpeg(['-i', input, '-t', meio.toString(), '-c', 'copy', out1]);
   await executarFFmpeg(['-i', input, '-ss', meio.toString(), '-c', 'copy', out2]);
 }
 
+// Reencoda vídeo para compatibilidade
 async function reencode(input, output) {
   await executarFFmpeg([
     '-i', input,
@@ -67,6 +73,7 @@ async function reencode(input, output) {
   ]);
 }
 
+// Junta vídeos usando lista .txt
 async function unirVideos(lista, saida) {
   const txt = 'list.txt';
   fs.writeFileSync(txt, lista.map(f => `file '${f}'`).join('\n'));
@@ -78,16 +85,18 @@ async function unirVideos(lista, saida) {
     console.log('🔑 Autenticando...');
     const auth = await autenticar();
 
-    const { video_principal, videos_opcionais } = JSON.parse(fs.readFileSync(inputFile));
+    const dados = JSON.parse(fs.readFileSync(inputFile));
+    const videoPrincipal = dados.video_principal;
+    const extras = dados.videos_opcionais || [];
 
     console.log('⬇️ Baixando vídeo principal...');
-    await baixarArquivo(video_principal, 'principal.mp4', auth);
+    await baixarArquivo(videoPrincipal, 'principal.mp4', auth);
 
     console.log('⌛ Obtendo duração do vídeo principal...');
     const duracao = await obterDuracao('principal.mp4');
     const meio = duracao / 2;
 
-    console.log('✂️ Cortando vídeo principal ao meio...');
+    console.log('✂️ Cortando vídeo principal...');
     await cortarVideo('principal.mp4', 'parte1_raw.mp4', 'parte2_raw.mp4', meio);
 
     console.log('⚙️ Reencodando partes principais...');
@@ -95,28 +104,29 @@ async function unirVideos(lista, saida) {
     await reencode('parte2_raw.mp4', 'parte2.mp4');
 
     const intermediarios = [];
-    let count = 0;
-    for (const id of videos_opcionais) {
-      const raw = `extra${count}_raw.mp4`;
-      const final = `extra${count}.mp4`;
-      console.log(`⬇️ Baixando vídeo opcional: ${id}`);
+    for (let i = 0; i < extras.length; i++) {
+      const id = extras[i];
+      const raw = `extra${i}_raw.mp4`;
+      const out = `extra${i}.mp4`;
+
+      console.log(`⬇️ Baixando vídeo extra ${i + 1}: ${id}`);
       await baixarArquivo(id, raw, auth);
 
-      console.log(`⚙️ Reencodando vídeo opcional ${count}...`);
-      await reencode(raw, final);
-
-      intermediarios.push(final);
-      count++;
+      console.log(`⚙️ Reencodando vídeo extra ${i + 1}...`);
+      await reencode(raw, out);
+      intermediarios.push(out);
     }
 
-    const ordem = ['parte1.mp4', ...intermediarios, 'parte2.mp4'];
-    console.log('🎬 Unindo todos os vídeos...');
-    await unirVideos(ordem, 'video_unido.mp4');
+    const ordemFinal = ['parte1.mp4', ...intermediarios, 'parte2.mp4'];
+
+    console.log('🎬 Unindo vídeos finais...');
+    await unirVideos(ordemFinal, 'video_unido.mp4');
 
     const sizeMB = (fs.statSync('video_unido.mp4').size / 1024 / 1024).toFixed(2);
     console.log(`✅ Vídeo final criado: video_unido.mp4 (${sizeMB} MB)`);
-  } catch (error) {
-    console.error('❌ Erro:', error);
+
+  } catch (err) {
+    console.error('❌ Erro:', err);
     process.exit(1);
   }
 })();
