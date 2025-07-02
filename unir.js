@@ -23,17 +23,46 @@ async function autenticar() {
   return await auth.getClient();
 }
 
-// Baixa arquivo do Google Drive
+// Baixa arquivo do Google Drive com tratamento de erro detalhado
 async function baixarArquivo(fileId, destino, auth) {
   const drive = google.drive({ version: 'v3', auth });
-  const res = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' });
 
-  return new Promise((resolve, reject) => {
-    const output = fs.createWriteStream(destino);
-    res.data.pipe(output);
-    res.data.on('end', () => resolve());
-    res.data.on('error', err => reject(err));
-  });
+  try {
+    const res = await drive.files.get(
+      { fileId, alt: 'media' },
+      { responseType: 'stream' }
+    );
+
+    return new Promise((resolve, reject) => {
+      const output = fs.createWriteStream(destino);
+      res.data.pipe(output);
+      res.data.on('end', () => resolve());
+      res.data.on('error', err => reject(new Error(`Erro no stream: ${err.message}`)));
+    });
+
+  } catch (error) {
+    let mensagemErro = `Erro ao baixar o arquivo ${fileId} do Google Drive.\n`;
+
+    if (error.response) {
+      const status = error.response.status;
+      const statusText = error.response.statusText;
+      mensagemErro += `Código HTTP: ${status} - ${statusText}\n`;
+
+      if (error.response.data && typeof error.response.data === 'object') {
+        const erroDetalhado = error.response.data.error;
+        if (erroDetalhado) {
+          mensagemErro += `Erro: ${erroDetalhado.message}\n`;
+          if (erroDetalhado.errors && erroDetalhado.errors.length > 0) {
+            mensagemErro += `Motivo: ${erroDetalhado.errors[0].reason}\n`;
+          }
+        }
+      }
+    } else {
+      mensagemErro += `Mensagem: ${error.message}`;
+    }
+
+    throw new Error(mensagemErro);
+  }
 }
 
 // Retorna duração de um vídeo
@@ -80,6 +109,7 @@ async function unirVideos(lista, saida) {
   await executarFFmpeg(['-f', 'concat', '-safe', '0', '-i', txt, '-c', 'copy', saida]);
 }
 
+// Execução principal
 (async () => {
   try {
     console.log('🔑 Autenticando...');
@@ -126,7 +156,7 @@ async function unirVideos(lista, saida) {
     console.log(`✅ Vídeo final criado: video_unido.mp4 (${sizeMB} MB)`);
 
   } catch (err) {
-    console.error('❌ Erro:', err);
+    console.error('❌ Erro:', err.message || err);
     process.exit(1);
   }
 })();
